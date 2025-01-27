@@ -8,7 +8,11 @@ from flask import Flask, jsonify, request
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 # Environment variables for configuration
@@ -29,13 +33,15 @@ def webhook_handler():
     payload = request.get_json()
     logger.info("Received webhook payload: %s", payload)
     
-    event_name = payload.get("event", "").strip()
+    # Extract notification name from the nested payload structure
+    event_name = payload.get("payload", {}).get("notification_name", "").strip()
     
     if event_name.lower() in EVENTS_TRACKED:
         logger.info("Forwarding event: %s", event_name)
         forward_to_getdx(payload)
     else:
         logger.info("Event not tracked, ignoring: %s", event_name)
+        logger.debug("Tracked events are: %s", EVENTS_TRACKED)
     
     return jsonify({"status": "received"})
 
@@ -44,18 +50,19 @@ def forward_to_getdx(payload):
         logger.error("GETDX_API_KEY is not set")
         return
     
-    # Extract user information more flexibly
-    user_email = payload.get("user", {}).get("email") or payload.get("user_email")
+    coder_payload = payload.get("payload", {})
     
     getdx_payload = {
-        "name": payload.get("event"),
-        "email": user_email,
+        "name": coder_payload.get("notification_name"),
+        "email": coder_payload.get("user_email"),
         "timestamp": payload.get("timestamp"),
         "properties": {
-            "workspace_name": payload.get("workspace", {}).get("name"),
-            "template_name": payload.get("template", {}).get("name"),
-            "user_name": payload.get("user", {}).get("username"),
-            "organization": payload.get("organization", {}).get("name")
+            "workspace_name": coder_payload.get("data", {}).get("workspace", {}).get("name"),
+            "template_name": coder_payload.get("data", {}).get("template", {}).get("name"),
+            "user_name": coder_payload.get("user_name"),
+            "user_username": coder_payload.get("user_username"),
+            "template_version": coder_payload.get("data", {}).get("template_version", {}).get("name"),
+            "labels": coder_payload.get("labels")
         }
     }
     
