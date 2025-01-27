@@ -71,9 +71,13 @@ def forward_to_getdx(payload):
     # Remove None values from metadata
     getdx_payload["metadata"] = {k: v for k, v in getdx_payload["metadata"].items() if v is not None}
     
+    # Debug log the API key (masked)
+    masked_key = f"{GETDX_API_KEY[:4]}...{GETDX_API_KEY[-4:]}" if GETDX_API_KEY else "None"
+    logger.debug("Using API key: %s", masked_key)
+    
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {GETDX_API_KEY}"
+        "Authorization": f"Bearer {GETDX_API_KEY.strip()}"  # Added strip() to remove any whitespace
     }
     
     logger.info("Forwarding event to getDX with payload: %s", getdx_payload)
@@ -84,10 +88,17 @@ def forward_to_getdx(payload):
         logger.info("Successfully forwarded event to getDX. Response: %s", response.text)
     except requests.exceptions.RequestException as e:
         logger.error("Failed to forward event to getDX: %s", e)
+        # Log the actual response if available
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error("getDX error response: %s", e.response.text)
 
 @app.route("/health")
 def health_check():
     return jsonify({"status": "healthy"})
 
 if __name__ == "__main__":
+    if not GETDX_API_KEY:
+        logger.warning("GETDX_API_KEY is not set or empty")
+    else:
+        logger.info("GETDX_API_KEY is configured (length: %d)", len(GETDX_API_KEY))
     app.run(host="0.0.0.0", port=8080, debug=True)
