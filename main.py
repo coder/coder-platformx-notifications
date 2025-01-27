@@ -3,6 +3,7 @@ import os
 import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
+import time
 
 # Load environment variables from .env file
 load_dotenv()
@@ -55,9 +56,9 @@ def forward_to_getdx(payload):
     getdx_payload = {
         "name": coder_payload.get("notification_name"),
         "email": coder_payload.get("user_email"),
-        "timestamp": payload.get("timestamp"),
-        "metadata": payload,  # Send the entire webhook payload as metadata
-        "properties": {
+        "timestamp": str(int(time.time())),  # Current timestamp since Coder doesn't provide one
+        "metadata": {
+            "full_webhook": payload,  # The complete webhook payload
             "workspace_name": coder_payload.get("data", {}).get("workspace", {}).get("name"),
             "template_name": coder_payload.get("data", {}).get("template", {}).get("name"),
             "user_name": coder_payload.get("user_name"),
@@ -67,8 +68,8 @@ def forward_to_getdx(payload):
         }
     }
     
-    # Remove None values from properties
-    getdx_payload["properties"] = {k: v for k, v in getdx_payload["properties"].items() if v is not None}
+    # Remove None values from metadata
+    getdx_payload["metadata"] = {k: v for k, v in getdx_payload["metadata"].items() if v is not None}
     
     headers = {
         "Content-Type": "application/json",
