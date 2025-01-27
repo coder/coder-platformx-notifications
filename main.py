@@ -56,6 +56,7 @@ def forward_to_getdx(payload):
         "name": coder_payload.get("notification_name"),
         "email": coder_payload.get("user_email"),
         "timestamp": payload.get("timestamp"),
+        "metadata": payload,  # Send the entire webhook payload as metadata
         "properties": {
             "workspace_name": coder_payload.get("data", {}).get("workspace", {}).get("name"),
             "template_name": coder_payload.get("data", {}).get("template", {}).get("name"),
@@ -74,10 +75,12 @@ def forward_to_getdx(payload):
         "Authorization": f"Bearer {GETDX_API_KEY}"
     }
     
+    logger.info("Forwarding event to getDX with payload: %s", getdx_payload)
+    
     try:
         response = requests.post("https://api.getdx.com/events.track", json=getdx_payload, headers=headers)
         response.raise_for_status()
-        logger.info("Successfully forwarded event to getDX")
+        logger.info("Successfully forwarded event to getDX. Response: %s", response.text)
     except requests.exceptions.RequestException as e:
         logger.error("Failed to forward event to getDX: %s", e)
 
