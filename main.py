@@ -85,7 +85,7 @@ def forward_to_getdx(payload):
     try:
         response = requests.post("https://api.getdx.com/events.track", json=getdx_payload, headers=headers)
         response.raise_for_status()
-        logger.info("Successfully forwarded event to getDX. Response: %s", response.text)
+        logger.info("Forwarded event to getDX. Response: %s", response.text)
     except requests.exceptions.RequestException as e:
         logger.error("Failed to forward event to getDX: %s", e)
         # Log the actual response if available
