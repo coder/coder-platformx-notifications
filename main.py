@@ -31,20 +31,28 @@ def hello_world():
 
 @app.route("/", methods=['POST'])
 def webhook_handler():
-    payload = request.get_json()
-    logger.info("Received webhook payload: %s", payload)
-    
-    # Extract notification name from the nested payload structure
-    event_name = payload.get("payload", {}).get("notification_name", "").strip()
-    
-    if event_name.lower() in EVENTS_TRACKED:
-        logger.info("Forwarding event: %s", event_name)
-        forward_to_getdx(payload)
-    else:
-        logger.info("Event not tracked, ignoring: %s", event_name)
-        logger.debug("Tracked events are: %s", EVENTS_TRACKED)
-    
-    return jsonify({"status": "received"})
+    try:
+        payload = request.get_json()
+        logger.info("Received webhook payload: %s", payload)
+        
+        # Extract notification name from the nested payload structure
+        event_name = payload.get("payload", {}).get("notification_name", "").strip()
+        
+        if event_name.lower() in EVENTS_TRACKED:
+            logger.info("Forwarding event: %s", event_name)
+            try:
+                forward_to_getdx(payload)
+            except Exception as e:
+                logger.error("Error forwarding to getDX: %s", e)
+                # Continue processing - don't let getDX errors break the webhook
+        else:
+            logger.info("Event not tracked, ignoring: %s", event_name)
+            logger.debug("Tracked events are: %s", EVENTS_TRACKED)
+        
+        return jsonify({"status": "received"})
+    except Exception as e:
+        logger.error("Error processing webhook: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 def forward_to_getdx(payload):
     if not GETDX_API_KEY:
@@ -52,24 +60,40 @@ def forward_to_getdx(payload):
         return
     
     coder_payload = payload.get("payload", {})
+    labels = coder_payload.get("labels", {})
+    
+    # Determine the correct email based on the event type
+    event_name = coder_payload.get("notification_name", "").lower()
+    if "account created" in event_name:
+        user_email = labels.get("created_account_user_name")
+    elif "account deleted" in event_name:
+        user_email = labels.get("deleted_account_user_name")
+    else:
+        user_email = coder_payload.get("user_email")
     
     getdx_payload = {
         "name": coder_payload.get("notification_name"),
-        "email": coder_payload.get("user_email"),
-        "timestamp": str(int(time.time())),  # Current timestamp since Coder doesn't provide one
+        "email": user_email,
+        "timestamp": str(int(time.time())),
         "metadata": {
-            "full_webhook": payload,  # The complete webhook payload
+            "full_webhook": payload,
             "workspace_name": coder_payload.get("data", {}).get("workspace", {}).get("name"),
             "template_name": coder_payload.get("data", {}).get("template", {}).get("name"),
             "user_name": coder_payload.get("user_name"),
             "user_username": coder_payload.get("user_username"),
             "template_version": coder_payload.get("data", {}).get("template_version", {}).get("name"),
-            "labels": coder_payload.get("labels")
+            "labels": labels,
+            "initiator_email": coder_payload.get("user_email"),  # Keep track of who initiated the action
+            "initiator_name": labels.get("initiator")
         }
     }
     
     # Remove None values from metadata
     getdx_payload["metadata"] = {k: v for k, v in getdx_payload["metadata"].items() if v is not None}
+    
+    if not user_email:
+        logger.error("No user email found in payload")
+        return
     
     # Debug log the API key (masked)
     masked_key = f"{GETDX_API_KEY[:4]}...{GETDX_API_KEY[-4:]}" if GETDX_API_KEY else "None"
@@ -77,7 +101,7 @@ def forward_to_getdx(payload):
     
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {GETDX_API_KEY.strip()}"  # Added strip() to remove any whitespace
+        "Authorization": f"Bearer {GETDX_API_KEY.strip()}"
     }
     
     logger.info("Forwarding event to getDX with payload: %s", getdx_payload)
@@ -88,7 +112,6 @@ def forward_to_getdx(payload):
         logger.info("Forwarded event to getDX. Response: %s", response.text)
     except requests.exceptions.RequestException as e:
         logger.error("Failed to forward event to getDX: %s", e)
-        # Log the actual response if available
         if hasattr(e, 'response') and e.response is not None:
             logger.error("getDX error response: %s", e.response.text)
 
