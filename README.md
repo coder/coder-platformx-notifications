@@ -4,8 +4,10 @@
 
 This sample middleware transforms Coder notification payloads into PlatformX-compatible payloads and forwards them to [PlatformX by getDX](https://getdx.com/platformx) for tracking. It is optimized for serverless platforms such as AWS Lambda and Google Cloud Run but may require modifications to fit your organization's needs.
 
+![PlatformX Screenshot with Coder Events](./platformx-screenshot.png)
+
 > [!NOTE]
-> This is a sample implementation. Adaptations in other languages and frameworks are possible.
+> This repository is a sample implementation. Adaptations in other languages and frameworks are possible.
 
 ## Features
 

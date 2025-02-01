@@ -1,0 +1,28 @@
+# Documentation and media
+README.md
+platformx-screenshot.png
+LICENSE
+
+# Development files
+.git
+.gitignore
+.env
+.env.example
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Test files
+tests/
+test_*.py
+
+# Local development
+venv/
+.python-version 
