@@ -42,7 +42,7 @@ docker run -p 8080:8080 --env-file .env coder-platformx-events-middleware
 
 ## Environment Variables
 
-Create a `.env` file in the project root and set the following variables. A `.env.sample` file is included with all supported notifications tracked.
+The application expects the following environment variables when started. For local development, create a `.env` file in the project root and set the following variables. A `.env.sample` file is included.
 
 | Variable       | Description                            | Example                                  |
 | -------------- | -------------------------------------- | ---------------------------------------- |
