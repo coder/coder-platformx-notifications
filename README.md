@@ -9,36 +9,9 @@ This sample middleware transforms Coder notification payloads into PlatformX-com
 > [!NOTE]
 > This repository is a sample implementation. Adaptations in other languages and frameworks are possible.
 
-## Features
-
-- Receives webhooks from Coder
-- Filters tracked events based on environment configuration
-- Converts Coder payloads into PlatformX-compatible format
-- Forwards formatted events to PlatformX by getDX API
-- Logs requests and responses for debugging
-
-## Requirements
-
-- Python 3.x
-- Flask
-- Requests
-- Python-dotenv
-
-## Installation
-
-1. Clone the repository:
-   ```sh
-   git clone <repo-url>
-   cd <repo-directory>
-   ```
-2. Install dependencies:
-   ```sh
-   pip install -r requirements.txt
-   ```
-
 ## How It Works
 
-Coder sends event notifications via webhooks to this middleware, which processes and reformats the payload into a structure compatible with [PlatformX by getDX](https://help.getdx.com/en/articles/7880779-getting-started). The transformed payload is then forwarded to PlatformX for further processing and analysis.
+Coder sends [notifications](https://coder.com/docs/admin/monitoring/notifications) via webhooks to this middleware, which processes and reformats the payload into a structure compatible with [PlatformX by getDX](https://help.getdx.com/en/articles/7880779-getting-started). The transformed payload is then forwarded to PlatformX for further processing and analysis.
 
 ```mermaid
 graph TD;
@@ -56,17 +29,26 @@ This middleware supports the following [Coder notifications](https://coder.com/d
 - User Account Suspended
 - User Account Activated
 
-## Environment Variables
+## Deployment
 
-Create a `.env` file in the project root and set the following variables:
+This middleware is optimized for serverless environments such as Google Cloud Run and AWS Lambda. If using Docker as a fallback:
 
-```ini
-LOG_LEVEL=INFO  # Options: DEBUG, INFO, WARNING
-GETDX_API_KEY=<your-getdx-api-key>
-EVENTS_TRACKED=Workspace Created,Workspace Manually Updated,User Account Created,User Account Suspended,User Account Activated
+```sh
+git clone <repo-url>
+cd <repo-directory>
+docker build -t coder-platformx-events-middleware .
+docker run -p 8080:8080 --env-file .env coder-platformx-events-middleware
 ```
 
-A `.env.sample` file is included with all supported notifications tracked.
+## Environment Variables
+
+Create a `.env` file in the project root and set the following variables. A `.env.sample` file is included with all supported notifications tracked.
+
+| Variable       | Description                            | Example                                  |
+| -------------- | -------------------------------------- | ---------------------------------------- |
+| LOG_LEVEL      | Logging level (DEBUG, INFO, WARNING)   | INFO                                     |
+| GETDX_API_KEY  | API key for PlatformX                  | your-api-key                             |
+| EVENTS_TRACKED | Comma-separated list of tracked events | Workspace Created,User Account Suspended |
 
 ## Usage with Coder Server
 
@@ -79,10 +61,6 @@ export CODER_NOTIFICATIONS_METHOD=webhook
 
 Replace `<your-deployed-app-url>` with the actual URL where this middleware is hosted.
 
-## Payload Transformation
-
-The primary goal of this middleware is to transform the [Coder webhook payload](https://coder.com/docs/admin/monitoring/notifications) into a [PlatformX-compatible payload](https://help.getdx.com/en/articles/7880779-getting-started) before forwarding.
-
 ## API Endpoints
 
 - `GET /` - Health check endpoint
@@ -90,21 +68,30 @@ The primary goal of this middleware is to transform the [Coder webhook payload](
 
 ## Logging
 
-Logs are printed to the console and can be adjusted using the `LOG_LEVEL` variable. Available levels:
+Logs are printed to the console and can be adjusted using the `LOG_LEVEL` variable. The available levels are:
 
-- DEBUG: Most verbose, useful for debugging
-- INFO: Standard logging for normal operation
-- WARNING: Only logs warnings and errors
+| Level   | Description                           |
+| ------- | ------------------------------------- |
+| DEBUG   | Most verbose, useful for debugging    |
+| INFO    | Standard logging for normal operation |
+| WARNING | Logs only warnings and errors         |
 
-## Deployment
+## Development
 
-This middleware is optimized for serverless environments such as Google Cloud Run and AWS Lambda. If using Docker as a fallback:
+This application was written in Python 3.11.x.
 
-```sh
-docker build -t coder-platformx-events-middleware .
-docker run -p 8080:8080 --env-file .env coder-platformx-events-middleware
-```
+1. Clone the repository:
+   ```sh
+   git clone <repo-url>
+   cd <repo-directory>
+   ```
+2. Install dependencies:
 
-## License
+   ```sh
+   pip install -r requirements.txt
+   ```
 
-MIT License
+3. Start the Flask development server:
+   ```sh
+   python3 main.py
+   ```
