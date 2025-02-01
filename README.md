@@ -39,7 +39,7 @@ Coder sends event notifications via webhooks to this middleware, which processes
 
 ```mermaid
 graph TD;
-    Coder[Coder Notifications] -->|Webhook| Middleware[PlatformX Middleware];
+    Coder[Coder Server Notifications] -->|Webhook| Middleware[PlatformX Middleware];
     Middleware -->|Transforms Payload| PlatformX[PlatformX API];
 ```
 
@@ -67,7 +67,7 @@ A `.env.sample` file is included with all supported notifications tracked.
 
 ## Usage with Coder Server
 
-To configure Coder to send notifications to this middleware, set the following environment variables in your Coder server:
+To configure Coder to send notifications to this middleware, set the following environment variables for your Coder server:
 
 ```sh
 export CODER_NOTIFICATIONS_WEBHOOK_ENDPOINT=<your-deployed-app-url>
