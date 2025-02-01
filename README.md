@@ -52,7 +52,7 @@ The application expects the following environment variables when started. For lo
 
 ## Usage with Coder Server
 
-To configure Coder to send notifications to this middleware, set the following environment variables for your Coder server:
+You must be running Coder v2.19+. To configure Coder to send notifications to this middleware, set the following environment variables for your Coder server:
 
 ```sh
 export CODER_NOTIFICATIONS_WEBHOOK_ENDPOINT=<your-deployed-app-url>
