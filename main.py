@@ -1,29 +1,107 @@
 import logging
 import os
+import time
 import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
-import time
 
-# Load environment variables from .env file
+# Load environment variables and configure logging
 load_dotenv()
 
-# Configure logging
+# Configure logging levels
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVELS = {
+    "DEBUG": logging.DEBUG,     # Most verbose - shows payloads, redacted API keys
+    "INFO": logging.INFO,       # Normal - shows event names and forwarding status
+    "WARNING": logging.WARNING  # Least verbose - shows only warnings and errors
+}
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=LOG_LEVELS.get(LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
-# Environment variables for configuration
+# Load configuration
 GETDX_API_KEY = os.getenv("GETDX_API_KEY")
-EVENTS_TRACKED = os.getenv("EVENTS_TRACKED", "").split(",")
+EVENTS_TRACKED = [event.strip() for event in os.getenv("EVENTS_TRACKED", "").split(",") if event.strip()]
 
-# Clean up event list and convert to lowercase for case-insensitive comparison
-EVENTS_TRACKED = [event.strip().lower() for event in EVENTS_TRACKED]
-
+# Initialize Flask app
 app = Flask(__name__)
+
+def normalize_event_name(event_name):
+    """Normalize event name for case-insensitive comparison."""
+    return " ".join(event_name.lower().split())
+
+def get_target_email(payload):
+    """Extract the appropriate email based on event type."""
+    coder_payload = payload.get("payload", {})
+    event_name = coder_payload.get("notification_name", "").lower()
+    
+    if "workspace" in event_name:
+        return coder_payload.get("data", {}).get("owner", {}).get("email")
+    elif "user account" in event_name:
+        return coder_payload.get("data", {}).get("user", {}).get("email")
+    return None
+
+def prepare_getdx_payload(coder_webhook):
+    """Prepare the payload for getDX API."""
+    coder_payload = coder_webhook.get("payload", {})
+    
+    # Create clean version without notification recipient details
+    clean_payload = coder_webhook.copy()
+    clean_inner = clean_payload.get("payload", {}).copy()
+    
+    # Remove admin notification fields
+    for field in ["user_id", "user_email", "user_name", "user_username"]:
+        clean_inner.pop(field, None)
+    clean_payload["payload"] = clean_inner
+    
+    return {
+        "name": coder_payload.get("notification_name"),
+        "email": get_target_email(coder_webhook),
+        "timestamp": str(int(time.time())),
+        "metadata": {
+            "full_webhook": clean_payload,
+            "labels": coder_payload.get("labels"),
+            "event_data": coder_payload.get("data")
+        }
+    }
+
+def forward_to_getdx(payload):
+    """Forward event to getDX API."""
+    if not GETDX_API_KEY:
+        logger.error("GETDX_API_KEY is not set")
+        return
+    
+    getdx_payload = prepare_getdx_payload(payload)
+    if not getdx_payload["email"]:
+        logger.error("No target email found in payload")
+        return
+    
+    # Remove None values from metadata
+    getdx_payload["metadata"] = {k: v for k, v in getdx_payload["metadata"].items() if v is not None}
+    
+    logger.debug("Using API key: %s...%s", GETDX_API_KEY[:4], GETDX_API_KEY[-4:])
+    logger.debug("Forwarding to getDX with payload: %s", getdx_payload)
+    
+    try:
+        response = requests.post(
+            "https://api.getdx.com/events.track",
+            json=getdx_payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {GETDX_API_KEY.strip()}"
+            }
+        )
+        response.raise_for_status()
+        logger.info("Successfully forwarded event to getDX")
+        logger.debug("getDX response: %s", response.text)
+    except requests.exceptions.RequestException as e:
+        logger.error("Failed to forward event to getDX: %s", e)
+        if hasattr(e, 'response') and e.response:
+            logger.error("getDX error response: %s", e.response.text)
 
 @app.route("/", methods=['GET'])
 def hello_world():
@@ -33,95 +111,25 @@ def hello_world():
 def webhook_handler():
     try:
         payload = request.get_json()
-        logger.info("Received webhook payload: %s", payload)
-        
-        # Extract notification name from the nested payload structure
         event_name = payload.get("payload", {}).get("notification_name", "").strip()
         
-        if event_name.lower() in EVENTS_TRACKED:
+        logger.debug("Received webhook payload: %s", payload)
+        logger.info("Received webhook for event: %s", event_name)
+        
+        if normalize_event_name(event_name) in [normalize_event_name(e) for e in EVENTS_TRACKED]:
             logger.info("Forwarding event: %s", event_name)
-            try:
-                forward_to_getdx(payload)
-            except Exception as e:
-                logger.error("Error forwarding to getDX: %s", e)
-                # Continue processing - don't let getDX errors break the webhook
+            forward_to_getdx(payload)
         else:
             logger.info("Event not tracked, ignoring: %s", event_name)
-            logger.debug("Tracked events are: %s", EVENTS_TRACKED)
         
         return jsonify({"status": "received"})
     except Exception as e:
         logger.error("Error processing webhook: %s", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-def forward_to_getdx(payload):
-    if not GETDX_API_KEY:
-        logger.error("GETDX_API_KEY is not set")
-        return
-    
-    coder_payload = payload.get("payload", {})
-    labels = coder_payload.get("labels", {})
-    
-    # Determine the correct email based on the event type
-    event_name = coder_payload.get("notification_name", "").lower()
-    if "account created" in event_name:
-        user_email = labels.get("created_account_user_name")
-    elif "account deleted" in event_name:
-        user_email = labels.get("deleted_account_user_name")
-    else:
-        user_email = coder_payload.get("user_email")
-    
-    getdx_payload = {
-        "name": coder_payload.get("notification_name"),
-        "email": user_email,
-        "timestamp": str(int(time.time())),
-        "metadata": {
-            "full_webhook": payload,
-            "workspace_name": coder_payload.get("data", {}).get("workspace", {}).get("name"),
-            "template_name": coder_payload.get("data", {}).get("template", {}).get("name"),
-            "user_name": coder_payload.get("user_name"),
-            "user_username": coder_payload.get("user_username"),
-            "template_version": coder_payload.get("data", {}).get("template_version", {}).get("name"),
-            "labels": labels,
-            "initiator_email": coder_payload.get("user_email"),  # Keep track of who initiated the action
-            "initiator_name": labels.get("initiator")
-        }
-    }
-    
-    # Remove None values from metadata
-    getdx_payload["metadata"] = {k: v for k, v in getdx_payload["metadata"].items() if v is not None}
-    
-    if not user_email:
-        logger.error("No user email found in payload")
-        return
-    
-    # Debug log the API key (masked)
-    masked_key = f"{GETDX_API_KEY[:4]}...{GETDX_API_KEY[-4:]}" if GETDX_API_KEY else "None"
-    logger.debug("Using API key: %s", masked_key)
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {GETDX_API_KEY.strip()}"
-    }
-    
-    logger.info("Forwarding event to getDX with payload: %s", getdx_payload)
-    
-    try:
-        response = requests.post("https://api.getdx.com/events.track", json=getdx_payload, headers=headers)
-        response.raise_for_status()
-        logger.info("Forwarded event to getDX. Response: %s", response.text)
-    except requests.exceptions.RequestException as e:
-        logger.error("Failed to forward event to getDX: %s", e)
-        if hasattr(e, 'response') and e.response is not None:
-            logger.error("getDX error response: %s", e.response.text)
-
-@app.route("/health")
-def health_check():
-    return jsonify({"status": "healthy"})
-
+# Log startup information
 if __name__ == "__main__":
-    if not GETDX_API_KEY:
-        logger.warning("GETDX_API_KEY is not set or empty")
-    else:
-        logger.info("GETDX_API_KEY is configured (length: %d)", len(GETDX_API_KEY))
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    logger.info("Server starting with log level: %s", LOG_LEVEL)
+    logger.info("To change verbosity, set LOG_LEVEL to: %s", ", ".join(LOG_LEVELS.keys()))
+    logger.info("Tracking events: %s", EVENTS_TRACKED)
+    app.run(host="0.0.0.0", port=8080)
