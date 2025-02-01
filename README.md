@@ -16,7 +16,7 @@ Coder sends [notifications](https://coder.com/docs/admin/monitoring/notification
 ```mermaid
 graph LR;
     Coder[Coder Server] -->|Webhook Notification| Middleware[PlatformX Middleware];
-    Middleware -->|Transforms Payload| PlatformX[PlatformX API];
+    Middleware -->|Transformed Payload| PlatformX[PlatformX API];
 ```
 
 ## Supported Notification Types
