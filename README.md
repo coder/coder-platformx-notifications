@@ -56,7 +56,7 @@ To configure Coder to send notifications to this middleware, set the following e
 
 ```sh
 export CODER_NOTIFICATIONS_WEBHOOK_ENDPOINT=<your-deployed-app-url>
-export CODER_NOTIFICATIONS_METHOD=webhook
+export CODER_NOTIFICATIONS_METHOD=webhook # Optional, as multiple methods are supported
 ```
 
 Replace `<your-deployed-app-url>` with the actual URL where this middleware is hosted.
