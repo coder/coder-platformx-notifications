@@ -11,7 +11,7 @@ This sample middleware transforms Coder notification payloads into PlatformX-com
 
 ## How It Works
 
-Coder sends [notifications](https://coder.com/docs/admin/monitoring/notifications) via webhooks to this middleware, which processes and reformats the payload into a structure compatible with [PlatformX by getDX](https://help.getdx.com/en/articles/7880779-getting-started). The transformed payload is then forwarded to PlatformX for further processing and analysis.
+Coder sends [notifications](https://coder.com/docs/admin/monitoring/notifications) via webhooks to this middleware, which processes and reformats the payload into a structure compatible with [PlatformX by DX](https://help.getdx.com/en/articles/7880779-getting-started). The transformed payload is then forwarded to PlatformX for further processing and analysis.
 
 ```mermaid
 graph LR;
