@@ -50,7 +50,6 @@ def prepare_getdx_payload(coder_webhook):
     coder_payload = coder_webhook.get("payload", {})
     
     # Create clean version without notification recipient details
-
     clean_payload = coder_webhook.copy()
     clean_inner = clean_payload.get("payload", {}).copy()
     
@@ -58,7 +57,7 @@ def prepare_getdx_payload(coder_webhook):
     for field in ["user_id", "user_email", "user_name", "user_username"]:
         clean_inner.pop(field, None)
     clean_payload["payload"] = clean_inner
-
+    
     # Extract template info
     template_name = (
         coder_payload.get("data", {}).get("template", {}).get("name")
@@ -68,14 +67,14 @@ def prepare_getdx_payload(coder_webhook):
         coder_payload.get("data", {}).get("template_version", {}).get("name")
         or coder_payload.get("labels", {}).get("version")
     )
-
+    
     # Extract all parameters as a dict
     parameters = {
         p.get("name"): p.get("value")
         for p in coder_payload.get("data", {}).get("parameters", [])
         if p.get("name")
     }
-
+    
     return {
         "name": coder_payload.get("notification_name"),
         "email": get_target_email(coder_webhook),
