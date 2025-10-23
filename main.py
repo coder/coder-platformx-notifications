@@ -46,27 +46,43 @@ def get_target_email(payload):
     return None
 
 def prepare_getdx_payload(coder_webhook):
-    """Prepare the payload for getDX API."""
     coder_payload = coder_webhook.get("payload", {})
-    
-    # Create clean version without notification recipient details
+
     clean_payload = coder_webhook.copy()
     clean_inner = clean_payload.get("payload", {}).copy()
-    
-    # Remove admin notification fields
     for field in ["user_id", "user_email", "user_name", "user_username"]:
         clean_inner.pop(field, None)
     clean_payload["payload"] = clean_inner
-    
+
+    # Extract template info
+    template_name = (
+        coder_payload.get("data", {}).get("template", {}).get("name")
+        or coder_payload.get("labels", {}).get("template")
+    )
+    template_version = (
+        coder_payload.get("data", {}).get("template_version", {}).get("name")
+        or coder_payload.get("labels", {}).get("version")
+    )
+
+    # Extract all parameters as a dict
+    parameters = {
+        p.get("name"): p.get("value")
+        for p in coder_payload.get("data", {}).get("parameters", [])
+        if p.get("name")
+    }
+
     return {
         "name": coder_payload.get("notification_name"),
         "email": get_target_email(coder_webhook),
         "timestamp": str(int(time.time())),
         "metadata": {
+            "template_name": template_name,
+            "template_version": template_version,
+            "parameters": params,
             "full_webhook": clean_payload,
             "labels": coder_payload.get("labels"),
-            "event_data": coder_payload.get("data")
-        }
+            "event_data": coder_payload.get("data"),
+        },
     }
 
 def forward_to_getdx(payload):
