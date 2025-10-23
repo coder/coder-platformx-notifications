@@ -46,10 +46,15 @@ def get_target_email(payload):
     return None
 
 def prepare_getdx_payload(coder_webhook):
+    """Prepare the payload for getDX API."""
     coder_payload = coder_webhook.get("payload", {})
+    
+    # Create clean version without notification recipient details
 
     clean_payload = coder_webhook.copy()
     clean_inner = clean_payload.get("payload", {}).copy()
+    
+    # Remove admin notification fields
     for field in ["user_id", "user_email", "user_name", "user_username"]:
         clean_inner.pop(field, None)
     clean_payload["payload"] = clean_inner
@@ -81,8 +86,8 @@ def prepare_getdx_payload(coder_webhook):
             "parameters": params,
             "full_webhook": clean_payload,
             "labels": coder_payload.get("labels"),
-            "event_data": coder_payload.get("data"),
-        },
+            "event_data": coder_payload.get("data")
+        }
     }
 
 def forward_to_getdx(payload):
