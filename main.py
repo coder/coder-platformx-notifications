@@ -82,7 +82,7 @@ def prepare_getdx_payload(coder_webhook):
         "metadata": {
             "template_name": template_name,
             "template_version": template_version,
-            "parameters": params,
+            "parameters": parameters,
             "full_webhook": clean_payload,
             "labels": coder_payload.get("labels"),
             "event_data": coder_payload.get("data")
